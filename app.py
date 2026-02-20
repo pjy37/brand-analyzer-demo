@@ -105,20 +105,27 @@ def call_naver_api(api_key, secret_key, customer_id, keyword):
     ).decode("utf-8")
 
     headers = {
+        "Content-Type": "application/json; charset=UTF-8",
         "X-Timestamp": timestamp,
         "X-API-KEY": api_key,
-        "X-Customer": customer_id,
+        "X-Customer": str(customer_id).strip(),
         "X-Signature": signature,
     }
-    params = {"hintKeywords": keyword, "showDetail": "1"}
+
+    # 네이버 API는 공백 포함 키워드를 허용하지 않음 → 쉼표로 변환
+    hint = keyword.strip().replace(" ", ",")
 
     resp = requests.get(
         "https://api.searchad.naver.com/keywordstool",
         headers=headers,
-        params=params,
+        params={"hintKeywords": hint, "showDetail": "1"},
         timeout=30,
     )
-    resp.raise_for_status()
+
+    if resp.status_code != 200:
+        detail = resp.text[:500] if resp.text else "응답 없음"
+        raise Exception(f"HTTP {resp.status_code}: {detail}")
+
     return resp.json()
 
 
@@ -180,18 +187,28 @@ def parse_volume(val):
 # ═══════════════════════════════════════
 # 사이드바 설정
 # ═══════════════════════════════════════
+# ═══════════════════════════════════════
+# API 키 로드 (Streamlit Secrets)
+# ═══════════════════════════════════════
+naver_api_key = st.secrets.get("API_KEY", "")
+naver_secret = st.secrets.get("SECRET_KEY", "")
+naver_customer = st.secrets.get("CUSTOMER_ID", "")
+claude_key = st.secrets.get("CLAUDE_API_KEY", "")
+
 with st.sidebar:
-    st.markdown("### ⚙️ API 설정")
+    st.markdown("### ⚙️ 설정")
 
-    st.markdown("**네이버 검색광고 API**")
-    naver_api_key = st.text_input("API 키 (License)", type="password", key="nk")
-    naver_secret = st.text_input("Secret 키", type="password", key="ns")
-    naver_customer = st.text_input("고객 ID", key="nc")
+    # API 연결 상태 표시
+    st.markdown("**API 연결 상태**")
+    if naver_api_key and naver_secret and naver_customer:
+        st.success("✅ 네이버 검색광고 API 연결됨")
+    else:
+        st.error("❌ 네이버 API 키 미설정")
 
-    st.divider()
-
-    st.markdown("**Anthropic Claude API**")
-    claude_key = st.text_input("Claude API 키", type="password", key="ck", placeholder="sk-ant-...")
+    if claude_key:
+        st.success("✅ Claude API 연결됨")
+    else:
+        st.error("❌ Claude API 키 미설정")
 
     st.divider()
 
@@ -205,7 +222,7 @@ with st.sidebar:
 
     st.divider()
     st.caption("💰 Claude API 비용: ~25원/회")
-    st.caption("v3.0 | [자동화]키워드_경쟁사추출")
+    st.caption("v3.0 | 키워드 경쟁사 추출")
 
 
 # ═══════════════════════════════════════
@@ -234,10 +251,10 @@ st.divider()
 # ═══════════════════════════════════════
 if search_clicked and keyword:
     if not naver_api_key or not naver_secret or not naver_customer:
-        st.error("❌ 사이드바에서 네이버 검색광고 API 키를 입력해주세요.")
+        st.error("❌ API 키가 설정되지 않았습니다. (Streamlit Secrets에 CUSTOMER_ID, API_KEY, SECRET_KEY 필요)")
         st.stop()
     if not claude_key:
-        st.error("❌ 사이드바에서 Claude API 키를 입력해주세요.")
+        st.error("❌ Claude API 키가 설정되지 않았습니다. (Streamlit Secrets에 CLAUDE_API_KEY 필요)")
         st.stop()
 
     kw = keyword.strip()
@@ -361,14 +378,14 @@ if search_clicked and keyword:
     st.dataframe(display_df, use_container_width=True, hide_index=False)
 
 else:
-    st.info("👆 키워드를 입력하고 **분석 시작**을 클릭하세요! (사이드바에서 API 키 설정 필요)")
+    st.info("👆 키워드를 입력하고 **분석 시작**을 클릭하세요!")
     st.markdown("""
     ### 🎯 이 도구는 이런 분석을 합니다
     > **"여드름"**을 검색하면 → 네이버 연관 키워드에서 "**메디큐브** 여드름 크림", "**아누아** 여드름 토너" 등을 찾아
     > **브랜드별 검색량 순위**를 자동으로 매겨줍니다.
-    
-    ### 🔧 시작하려면
-    1. **사이드바**(왼쪽 ⚙️)에서 네이버 API 키 + Claude API 키 입력
-    2. 검색창에 키워드 입력
-    3. **분석 시작** 클릭!
+
+    ### 🔧 사용법
+    1. 검색창에 키워드 입력
+    2. **분석 시작** 클릭!
+    3. AI가 자동으로 브랜드를 추출합니다
     """)
