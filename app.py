@@ -230,15 +230,31 @@ def parse_volume(val):
 with st.sidebar:
     st.markdown("### ⚙️ API 설정")
 
-    st.markdown("**네이버 검색광고 API**")
-    naver_api_key = st.text_input("API 키 (License)", type="password", key="nk")
-    naver_secret = st.text_input("Secret 키", type="password", key="ns")
-    naver_customer = st.text_input("고객 ID", key="nc")
+    # Streamlit Secrets에서 기본값 로드
+    default_api_key = st.secrets.get("API_KEY", "")
+    default_secret = st.secrets.get("SECRET_KEY", "")
+    default_customer = st.secrets.get("CUSTOMER_ID", "")
+    default_claude = st.secrets.get("CLAUDE_API_KEY", "")
 
-    st.divider()
+    # Secrets가 있으면 연결 상태 표시, 없으면 입력란 표시
+    if default_api_key and default_secret and default_customer:
+        st.success("✅ 네이버 검색광고 API 연결됨")
+        naver_api_key = default_api_key
+        naver_secret = default_secret
+        naver_customer = default_customer
+    else:
+        st.markdown("**네이버 검색광고 API**")
+        naver_api_key = st.text_input("API 키 (License)", type="password", key="nk")
+        naver_secret = st.text_input("Secret 키", type="password", key="ns")
+        naver_customer = st.text_input("고객 ID", key="nc")
 
-    st.markdown("**Anthropic Claude API**")
-    claude_key = st.text_input("Claude API 키", type="password", key="ck", placeholder="sk-ant-...")
+    if default_claude:
+        st.success("✅ Claude API 연결됨")
+        claude_key = default_claude
+    else:
+        st.divider()
+        st.markdown("**Anthropic Claude API**")
+        claude_key = st.text_input("Claude API 키", type="password", key="ck", placeholder="sk-ant-...")
 
     st.divider()
 
