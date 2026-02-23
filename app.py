@@ -470,18 +470,30 @@ if search_clicked and keyword:
             continue
         bl = brand_name.lower()
         pc_total, mb_total, matched_kws = 0, 0, []
+        matched_kw_details = []  # 키워드별 상세 검색량
 
         for item in kw_list:
             rel = (item.get("relKeyword") or "").lower()
             if bl in rel:
-                pc_total += parse_volume(item.get("monthlyPcQcCnt"))
-                mb_total += parse_volume(item.get("monthlyMobileQcCnt"))
+                pc = parse_volume(item.get("monthlyPcQcCnt"))
+                mb = parse_volume(item.get("monthlyMobileQcCnt"))
+                pc_total += pc
+                mb_total += mb
                 matched_kws.append(item.get("relKeyword", ""))
+                matched_kw_details.append({
+                    "keyword": item.get("relKeyword", ""),
+                    "pc": pc,
+                    "mobile": mb,
+                    "total": pc + mb,
+                })
 
         if matched_kws:
+            # 키워드 상세를 검색량 내림차순 정렬
+            matched_kw_details.sort(key=lambda x: x["total"], reverse=True)
             brand_results.append({
                 "brand": brand_name, "pc": pc_total, "mobile": mb_total,
                 "total": pc_total + mb_total, "keywords": matched_kws,
+                "keyword_details": matched_kw_details,
             })
 
     brand_results.sort(key=lambda x: x["total"], reverse=True)
@@ -623,6 +635,32 @@ if search_clicked and keyword:
     chart_df.columns = ["브랜드", vol_label]
     chart_df = chart_df.set_index("브랜드")
     st.bar_chart(chart_df, color="#00e5a0", horizontal=True, height=max(400, len(brand_results) * 35))
+
+    # ── 브랜드별 키워드 상세 ──
+    st.markdown("### 🔎 브랜드별 키워드 상세")
+    st.caption("각 브랜드를 펼치면 어떤 키워드로 검색량이 구성되었는지 확인할 수 있습니다.")
+
+    for i, br in enumerate(brand_results):
+        details = br.get("keyword_details", [])
+        brand_name = br["brand"]
+        total_vol = br["total"]
+        kw_count = len(details)
+
+        with st.expander(f"**{i+1}위 {brand_name}** — 통합 {total_vol:,} (키워드 {kw_count}개)", expanded=False):
+            if details:
+                detail_df = pd.DataFrame(details)
+                detail_df.index = detail_df.index + 1
+                detail_df.columns = ["키워드", "PC 검색량", "모바일 검색량", "통합 검색량"]
+
+                # 비중 컬럼 추가
+                if total_vol > 0:
+                    detail_df["비중"] = detail_df["통합 검색량"].apply(lambda x: f"{x/total_vol*100:.1f}%")
+                else:
+                    detail_df["비중"] = "0%"
+
+                st.dataframe(detail_df, use_container_width=True, hide_index=False)
+            else:
+                st.write("상세 데이터가 없습니다.")
 
     # ── 쇼핑 노출 기준 순위 ──
     if shopping_brands:
