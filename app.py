@@ -375,6 +375,8 @@ with col1:
 with col2:
     search_clicked = st.button("🔍 분석 시작", use_container_width=True, type="primary")
 
+st.caption("⚠️ 키워드는 **띄어쓰기 없이** 입력해주세요. (예: 여드름토너 ⭕ / 여드름 토너 ❌)")
+
 st.divider()
 
 # ═══════════════════════════════════════
@@ -606,10 +608,14 @@ if search_clicked and keyword:
             })
 
         compare_df = pd.DataFrame(compare_data)
-        # 양쪽 > 검색만 > 쇼핑만 순, 같은 구분 내에서는 검색량 순
+        # 양쪽: 검색량순, 검색만: 검색량순, 쇼핑만: 쇼핑순위순
         sort_order = {"🏆 양쪽": 0, "🔍 검색만": 1, "🛒 쇼핑만": 2}
         compare_df["_sort"] = compare_df["구분"].map(sort_order)
-        compare_df = compare_df.sort_values(["_sort", vol_label], ascending=[True, False]).drop("_sort", axis=1).reset_index(drop=True)
+        compare_df["_shop_rank"] = compare_df["쇼핑 순위"].apply(lambda x: x if isinstance(x, int) else 9999)
+        compare_df = compare_df.sort_values(
+            ["_sort", vol_label, "_shop_rank"],
+            ascending=[True, False, True]
+        ).drop(["_sort", "_shop_rank"], axis=1).reset_index(drop=True)
         compare_df.index = compare_df.index + 1
 
         st.dataframe(compare_df, use_container_width=True, hide_index=False)
@@ -633,6 +639,7 @@ if search_clicked and keyword:
 
     chart_df = df[["brand", vol_col]].copy()
     chart_df.columns = ["브랜드", vol_label]
+    chart_df = chart_df.iloc[::-1]  # 1위가 맨 위에 오도록 역순
     chart_df = chart_df.set_index("브랜드")
     st.bar_chart(chart_df, color="#00e5a0", horizontal=True, height=max(400, len(brand_results) * 35))
 
@@ -672,6 +679,7 @@ if search_clicked and keyword:
 
         shop_chart = shop_df[["brand", "product_count"]].copy()
         shop_chart.columns = ["브랜드", "상품 수"]
+        shop_chart = shop_chart.iloc[::-1]  # 1위가 맨 위에 오도록 역순
         shop_chart = shop_chart.set_index("브랜드")
         st.bar_chart(shop_chart, color="#ff6b35", horizontal=True, height=max(400, len(shop_df) * 35))
 
